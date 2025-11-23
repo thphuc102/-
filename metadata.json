@@ -1,0 +1,7 @@
+{
+  "name": "UIT Media FrameFusion Photobooth",
+  "description": "An elegant web-based photobooth application that allows you to upload a custom frame, add your photos, and generate a beautiful, printable photo strip. Perfect for events and parties.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
