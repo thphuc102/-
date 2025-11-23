@@ -106,6 +106,15 @@ export interface DrawingPath {
   width: number; // relative stroke width
 }
 
+export interface LayoutOption {
+  id: string;
+  label: string;
+  type: 'preset' | 'custom';
+  placeholders: Placeholder[];
+  isActive: boolean;
+  iconType: 'single' | 'grid' | 'strip' | 'custom';
+}
+
 export interface GuestScreenState {
   mode: GuestScreenMode;
   frameSrc?: string | null;
@@ -120,11 +129,12 @@ export interface GuestScreenState {
   aspectRatio?: string;
   isFlashActive?: boolean; // New: Trigger flash animation
   proSettings?: ProSettings; // Pass pro settings to guest
+  layoutOptions?: LayoutOption[]; // New: Pass available layouts to guest
 }
 
 export type GuestAction =
   | { type: 'GUEST_START' }
-  | { type: 'GUEST_SELECT_LAYOUT', layout: '1x1' | 'strip' | 'grid' | 'custom' }
+  | { type: 'GUEST_SELECT_LAYOUT', layout: string }
   | { type: 'GUEST_EMAIL', email: string }
   | { type: 'GUEST_PRINT' }
   | { type: 'GUEST_ADD_DRAWING', drawing: DrawingPath }
@@ -158,6 +168,7 @@ export type AppSettings = {
   placeholders: Placeholder[];
   aspectRatio: string;
   pro: ProSettings;
+  layoutOptions: LayoutOption[];
 } & OrganizerSettings;
 
 export interface UiConfig {

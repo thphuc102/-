@@ -28,31 +28,31 @@ const AttractMode: React.FC<{ frameSrc: string | null, onStart: () => void }> = 
     </div>
 );
 
-const ConfigSelectionMode: React.FC<{ onSelect: (layout: '1x1' | 'strip' | 'grid' | 'custom') => void }> = ({ onSelect }) => (
-    <div className="w-full h-full bg-gray-900 text-white flex flex-col items-center justify-center p-8">
-        <h2 className="text-5xl font-bold mb-12 uppercase tracking-wide">Choose Your Experience</h2>
-        <div className="grid grid-cols-4 gap-8 w-full max-w-7xl">
-            <button onClick={() => onSelect('1x1')} className="bg-gray-800 rounded-2xl p-8 flex flex-col items-center justify-center gap-6 border-4 border-transparent hover:border-indigo-500 hover:bg-gray-750 transition-all transform hover:scale-105 group">
-                <SingleIcon className="w-32 h-32 text-indigo-400 group-hover:text-white" />
-                <span className="text-3xl font-bold">Single Shot</span>
-            </button>
-            <button onClick={() => onSelect('grid')} className="bg-gray-800 rounded-2xl p-8 flex flex-col items-center justify-center gap-6 border-4 border-transparent hover:border-purple-500 hover:bg-gray-750 transition-all transform hover:scale-105 group">
-                <GridIcon className="w-32 h-32 text-purple-400 group-hover:text-white" />
-                <span className="text-3xl font-bold">2x2 Grid</span>
-            </button>
-            <button onClick={() => onSelect('strip')} className="bg-gray-800 rounded-2xl p-8 flex flex-col items-center justify-center gap-6 border-4 border-transparent hover:border-pink-500 hover:bg-gray-750 transition-all transform hover:scale-105 group">
-                <StripIcon className="w-32 h-32 text-pink-400 group-hover:text-white" />
-                <span className="text-3xl font-bold">Photo Strip</span>
-            </button>
-            <button onClick={() => onSelect('custom')} className="bg-gray-800 rounded-2xl p-8 flex flex-col items-center justify-center gap-6 border-4 border-transparent hover:border-yellow-500 hover:bg-gray-750 transition-all transform hover:scale-105 group">
-                <div className="w-32 h-32 border-4 border-dashed border-yellow-400 group-hover:border-white rounded-lg flex items-center justify-center">
-                    <span className="text-4xl font-bold text-yellow-400 group-hover:text-white">?</span>
-                </div>
-                <span className="text-3xl font-bold">Event Special</span>
-            </button>
+const ConfigSelectionMode: React.FC<{ layoutOptions: import('../types').LayoutOption[], onSelect: (layoutId: string) => void }> = ({ layoutOptions, onSelect }) => {
+    // Filter active layouts
+    const activeLayouts = layoutOptions?.filter(l => l.isActive) || [];
+
+    return (
+        <div className="w-full h-full bg-gray-900 text-white flex flex-col items-center justify-center p-8">
+            <h2 className="text-5xl font-bold mb-12 uppercase tracking-wide">Choose Your Experience</h2>
+            <div className="grid grid-cols-4 gap-8 w-full max-w-7xl">
+                {activeLayouts.map(layout => (
+                    <button key={layout.id} onClick={() => onSelect(layout.id)} className="bg-gray-800 rounded-2xl p-8 flex flex-col items-center justify-center gap-6 border-4 border-transparent hover:border-indigo-500 hover:bg-gray-750 transition-all transform hover:scale-105 group">
+                        {layout.iconType === 'single' && <SingleIcon className="w-32 h-32 text-indigo-400 group-hover:text-white" />}
+                        {layout.iconType === 'grid' && <GridIcon className="w-32 h-32 text-purple-400 group-hover:text-white" />}
+                        {layout.iconType === 'strip' && <StripIcon className="w-32 h-32 text-pink-400 group-hover:text-white" />}
+                        {layout.iconType === 'custom' && (
+                            <div className="w-32 h-32 border-4 border-dashed border-yellow-400 group-hover:border-white rounded-lg flex items-center justify-center">
+                                <span className="text-4xl font-bold text-yellow-400 group-hover:text-white">?</span>
+                            </div>
+                        )}
+                        <span className="text-3xl font-bold">{layout.label}</span>
+                    </button>
+                ))}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 const TetherPreviewMode: React.FC<{ frameSrc: string | null; placeholders: Placeholder[]; aspectRatio?: string }> = ({ frameSrc, placeholders, aspectRatio }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);

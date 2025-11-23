@@ -1,6 +1,5 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { AppSettings, PhotoboothSession, AppStep, Placeholder, Photo, Transform, Crop, UiConfig, GuestScreenMode, StickerLayer, TextLayer, AnalyticsData, GuestAction, InterWindowMessage, DrawingPath, Printer } from './types';
+import { AppSettings, PhotoboothSession, AppStep, Placeholder, Photo, Transform, Crop, UiConfig, GuestScreenMode, StickerLayer, TextLayer, AnalyticsData, GuestAction, InterWindowMessage, DrawingPath, Printer, LayoutOption, ProSettings } from './types';
 import FrameUploader from './components/FrameUploader';
 import TemplateDesigner from './components/TemplateDesigner';
 import PhotoSelector from './components/PhotoSelector';
@@ -44,7 +43,42 @@ const createPhotoFromPlaceholder = (src: string, placeholder: Placeholder, canva
 
 const hexToRgb = (hex: string): string => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '255, 255, 255';
+    return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)} ` : '255, 255, 255';
+};
+
+const generateDefaultLayouts = (): LayoutOption[] => {
+    const baseId = Date.now();
+    const margin = 0.05;
+    const gap = 0.03;
+    const availW = 1 - (margin * 2);
+    const availH = 1 - (margin * 2);
+
+    // 1x1
+    const single: Placeholder[] = [{ id: baseId, x: margin, y: margin, width: availW, height: availH, aspectRatio: null, fit: 'cover' }];
+
+    // Grid
+    const grid: Placeholder[] = [];
+    const w = (availW - gap) / 2;
+    const h = (availH - gap) / 2;
+    for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < 2; c++) {
+            grid.push({ id: baseId + r * 2 + c, x: margin + c * (w + gap), y: margin + r * (h + gap), width: w, height: h, aspectRatio: null, fit: 'cover' });
+        }
+    }
+
+    // Strip
+    const strip: Placeholder[] = [];
+    const sh = (availH - (gap * 2)) / 3;
+    for (let i = 0; i < 3; i++) {
+        strip.push({ id: baseId + i, x: margin, y: margin + i * (sh + gap), width: availW, height: sh, aspectRatio: null, fit: 'cover' });
+    }
+
+    return [
+        { id: '1x1', label: 'Single Shot', type: 'preset', placeholders: single, isActive: true, iconType: 'single' },
+        { id: 'grid', label: '2x2 Grid', type: 'preset', placeholders: grid, isActive: true, iconType: 'grid' },
+        { id: 'strip', label: 'Photo Strip', type: 'preset', placeholders: strip, isActive: true, iconType: 'strip' },
+        { id: 'custom', label: 'Event Special', type: 'custom', placeholders: [], isActive: true, iconType: 'custom' }
+    ];
 };
 
 const App: React.FC = () => {
@@ -68,7 +102,8 @@ const App: React.FC = () => {
             iccProfileName: null,
             enableSmartCrop: false,
             liveViewLut: ''
-        }
+        },
+        layoutOptions: generateDefaultLayouts()
     });
     const [session, setSession] = useState<PhotoboothSession>({
         isActive: false,
@@ -161,7 +196,7 @@ const App: React.FC = () => {
             channel.removeEventListener('message', handleGuestAction);
             channel.close();
         };
-    }, [settings.placeholders, session]); // Dependency on settings/session for callbacks
+    }, [settings.placeholders, session, settings.layoutOptions]); // Dependency on settings/session for callbacks
 
     const handleGuestActionDispatch = (action: GuestAction) => {
         switch (action.type) {
@@ -169,7 +204,7 @@ const App: React.FC = () => {
                 // Reset session and move to Config
                 setSession({ isActive: true, photos: [], stickers: [], textLayers: [], drawings: [], filter: '', isPaid: false });
                 setAnalytics(prev => ({ ...prev, totalSessions: prev.totalSessions + 1 }));
-                sendMessage({ mode: GuestScreenMode.CONFIG_SELECTION });
+                sendMessage({ mode: GuestScreenMode.CONFIG_SELECTION, layoutOptions: settings.layoutOptions });
                 break;
             case 'GUEST_SELECT_LAYOUT':
                 if (action.layout !== 'custom') {
@@ -208,36 +243,13 @@ const App: React.FC = () => {
         }
     };
 
-    const applyPresetLayout = (type: '1x1' | 'strip' | 'grid' | 'custom') => {
+    const applyPresetLayout = (type: string) => {
         if (type === 'custom') return;
 
-        // Mock canvas dims for relative calculations (can be improved by using real frame dim)
-        const dim = { w: 1000, h: 1500 };
-        const newSlots: Placeholder[] = [];
-        const baseId = Date.now();
-        const margin = 0.05;
-        const gap = 0.03;
-        const availW = 1 - (margin * 2);
-        const availH = 1 - (margin * 2);
-
-        if (type === '1x1') {
-            newSlots.push({ id: baseId, x: margin, y: margin, width: availW, height: availH, aspectRatio: null, fit: 'cover' });
-        } else if (type === 'grid') {
-            const w = (availW - gap) / 2;
-            const h = (availH - gap) / 2;
-            for (let r = 0; r < 2; r++) {
-                for (let c = 0; c < 2; c++) {
-                    newSlots.push({ id: baseId + r * 2 + c, x: margin + c * (w + gap), y: margin + r * (h + gap), width: w, height: h, aspectRatio: null, fit: 'cover' });
-                }
-            }
-        } else if (type === 'strip') {
-            const h = (availH - (gap * 2)) / 3;
-            for (let i = 0; i < 3; i++) {
-                newSlots.push({ id: baseId + i, x: margin, y: margin + i * (h + gap), width: availW, height: h, aspectRatio: null, fit: 'cover' });
-            }
+        const layout = settings.layoutOptions.find(l => l.id === type);
+        if (layout) {
+            setSettings(prev => ({ ...prev, placeholders: layout.placeholders }));
         }
-
-        setSettings(prev => ({ ...prev, placeholders: newSlots }));
     };
 
     useEffect(() => {
@@ -584,13 +596,13 @@ const App: React.FC = () => {
                 if (pIndex > -1) pool[pIndex].jobs++;
                 return { ...prev, pro: { ...prev.pro, printerPool: pool } };
             });
-            console.log(`Printing to Pool: ${printerName}`);
+            console.log(`Printing to Pool: ${printerName} `);
         }
 
         const printWindow = window.open('', '_blank');
         if (printWindow) {
             printWindow.document.write(`
-                <html>
+    < html >
                     <head><title>Print Job - ${printerName}</title></head>
                     <body style="margin:0; display:flex; justify-content:center; align-items:center; height:100vh; background-color: #f0f0f0;">
                         <div style="text-align:center;">
@@ -598,8 +610,8 @@ const App: React.FC = () => {
                             <p style="margin-top:20px; font-family:sans-serif; color:#555;">Sent to: <b>${printerName}</b></p>
                         </div>
                     </body>
-                </html>
-            `);
+                </html >
+    `);
             printWindow.document.close();
         }
 
@@ -833,7 +845,7 @@ const App: React.FC = () => {
             const firstPart = response.candidates?.[0]?.content?.parts?.[0];
             if (firstPart && firstPart.inlineData) {
                 const resultBase64 = firstPart.inlineData.data;
-                const resultUrl = `data:image/png;base64,${resultBase64}`;
+                const resultUrl = `data: image / png; base64, ${resultBase64} `;
                 setAiPreviewImage(resultUrl);
             } else {
                 throw new Error("AI did not return an image. Please try again.");
@@ -872,7 +884,7 @@ const App: React.FC = () => {
                 for (const part of response.candidates[0].content.parts) {
                     if (part.inlineData) {
                         const base64EncodeString = part.inlineData.data;
-                        stickerUrl = `data:image/png;base64,${base64EncodeString}`;
+                        stickerUrl = `data: image / png; base64, ${base64EncodeString} `;
                         break;
                     }
                 }
