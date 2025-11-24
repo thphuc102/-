@@ -237,73 +237,91 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
                 </button>
             </div>
 
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-                {localSettings.layoutOptions?.map(layout => (
-                    <div key={layout.id} className="flex items-center justify-between bg-gray-900 p-3 rounded-lg border border-gray-700 group">
-                        <div className="flex items-center gap-3 flex-1">
-                            <div className={`w-10 h-10 rounded flex items-center justify-center bg-gray-800 border border-gray-600 flex-shrink-0`}>
-                                {layout.iconType === 'single' && <div className="w-6 h-6 border-2 border-gray-400 rounded-sm"></div>}
-                                {layout.iconType === 'grid' && <div className="w-6 h-6 grid grid-cols-2 gap-0.5"><div className="bg-gray-400"></div><div className="bg-gray-400"></div><div className="bg-gray-400"></div><div className="bg-gray-400"></div></div>}
-                                {layout.iconType === 'strip' && <div className="w-4 h-6 flex flex-col gap-0.5"><div className="h-1.5 bg-gray-400 w-full"></div><div className="h-1.5 bg-gray-400 w-full"></div><div className="h-1.5 bg-gray-400 w-full"></div></div>}
-                                {layout.iconType === 'custom' && <span className="text-yellow-500 font-bold text-lg">?</span>}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <input
-                                    type="text"
-                                    value={layout.label}
-                                    onChange={(e) => {
-                                        const updatedLayouts = localSettings.layoutOptions.map(l =>
-                                            l.id === layout.id ? { ...l, label: e.target.value } : l
-                                        );
-                                        handleSettingChange('layoutOptions', updatedLayouts);
-                                    }}
-                                    className="bg-transparent border-none text-sm font-bold text-gray-200 focus:ring-0 p-0 w-full"
-                                />
-                                <p className="text-xs text-gray-500">{layout.placeholders.length} slots • {layout.type}</p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => {
-                                    const updatedLayouts = localSettings.layoutOptions.map(l =>
-                                        l.id === layout.id ? { ...l, placeholders: settings.placeholders } : l
-                                    );
-                                    handleSettingChange('layoutOptions', updatedLayouts);
-                                }}
-                                className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded"
-                                title="Update with current canvas design"
-                            >
-                                Update
-                            </button>
-
-                            <label className="relative inline-flex items-center cursor-pointer" title="Show to guests">
-                                <input
-                                    type="checkbox"
-                                    className="sr-only peer"
-                                    checked={layout.isActive}
-                                    onChange={(e) => {
-                                        const updatedLayouts = localSettings.layoutOptions.map(l =>
-                                            l.id === layout.id ? { ...l, isActive: e.target.checked } : l
-                                        );
-                                        handleSettingChange('layoutOptions', updatedLayouts);
-                                    }}
-                                />
-                                <div className="w-9 h-5 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600"></div>
-                            </label>
-
-                            {layout.type === 'custom' && (
-                                <button
-                                    onClick={() => handleRemoveLayout(layout.id)}
-                                    className="ml-2 text-red-500 hover:text-red-400 p-1"
-                                    title="Delete Layout"
-                                >
-                                    ✕
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                ))}
+            <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
+                <table className="min-w-full divide-y divide-gray-700">
+                    <thead className="bg-gray-800">
+                        <tr>
+                            <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-200 sm:pl-6">Icon</th>
+                            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-200">Label</th>
+                            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-200">Type</th>
+                            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-200">Active</th>
+                            <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                                <span className="sr-only">Actions</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-700 bg-gray-900">
+                        {localSettings.layoutOptions?.map((layout) => (
+                            <tr key={layout.id}>
+                                <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+                                    <div className={`w-10 h-10 rounded flex items-center justify-center bg-gray-800 border border-gray-600 flex-shrink-0`}>
+                                        {layout.iconType === 'single' && <div className="w-6 h-6 border-2 border-gray-400 rounded-sm"></div>}
+                                        {layout.iconType === 'grid' && <div className="w-6 h-6 grid grid-cols-2 gap-0.5"><div className="bg-gray-400"></div><div className="bg-gray-400"></div><div className="bg-gray-400"></div><div className="bg-gray-400"></div></div>}
+                                        {layout.iconType === 'strip' && <div className="w-4 h-6 flex flex-col gap-0.5"><div className="h-1.5 bg-gray-400 w-full"></div><div className="h-1.5 bg-gray-400 w-full"></div><div className="h-1.5 bg-gray-400 w-full"></div></div>}
+                                        {layout.iconType === 'custom' && <span className="text-yellow-500 font-bold text-lg">?</span>}
+                                    </div>
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-300">
+                                    <input
+                                        type="text"
+                                        value={layout.label}
+                                        onChange={(e) => {
+                                            const updatedLayouts = localSettings.layoutOptions.map(l =>
+                                                l.id === layout.id ? { ...l, label: e.target.value } : l
+                                            );
+                                            handleSettingChange('layoutOptions', updatedLayouts);
+                                        }}
+                                        className="bg-transparent border-b border-gray-600 focus:border-indigo-500 text-sm text-gray-200 focus:ring-0 p-1 w-full"
+                                    />
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                    {layout.type}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={layout.isActive}
+                                            onChange={(e) => {
+                                                const updatedLayouts = localSettings.layoutOptions.map(l =>
+                                                    l.id === layout.id ? { ...l, isActive: e.target.checked } : l
+                                                );
+                                                handleSettingChange('layoutOptions', updatedLayouts);
+                                            }}
+                                        />
+                                        <div className="w-9 h-5 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600"></div>
+                                    </label>
+                                </td>
+                                <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                                    <div className="flex items-center justify-end gap-2">
+                                        <button
+                                            onClick={() => {
+                                                const updatedLayouts = localSettings.layoutOptions.map(l =>
+                                                    l.id === layout.id ? { ...l, placeholders: settings.placeholders } : l
+                                                );
+                                                handleSettingChange('layoutOptions', updatedLayouts);
+                                            }}
+                                            className="text-indigo-400 hover:text-indigo-300"
+                                            title="Update with current canvas design"
+                                        >
+                                            Update
+                                        </button>
+                                        {layout.type === 'custom' && (
+                                            <button
+                                                onClick={() => handleRemoveLayout(layout.id)}
+                                                className="text-red-400 hover:text-red-300"
+                                                title="Delete Layout"
+                                            >
+                                                Delete
+                                            </button>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
         </div>
     );
