@@ -89,14 +89,19 @@ const UiCustomizationPanel: React.FC<UiCustomizationPanelProps> = ({ isOpen, onC
                       className="w-5 h-5 cursor-pointer accent-[var(--color-primary)]"
                     />
                 </div>
-           <div>
-                <label htmlFor="font" className="block text-sm font-medium opacity-80">Font Family</label>
-                <select id="font" value={config.fontFamily} onChange={(e) => onConfigChange({ ...config, fontFamily: e.target.value })} className="mt-1 block w-full bg-[var(--color-background)] border border-[var(--color-border)] rounded-md p-2 text-sm focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]">
-                    {fontOptions.map(font => (
-            <button onClick={onClose} className="w-full px-4 py-2 bg-[var(--color-primary)] text-white font-semibold rounded-lg shadow-md filter hover:brightness-110" aria-label="Close panel and apply changes">
-                Done
-            </button>
-            </div>
+          <div>
+            <label htmlFor="font" className="block text-sm font-medium opacity-80">Font Family</label>
+            <select
+              id="font"
+              value={config.fontFamily}
+              onChange={(e) => onConfigChange({ ...config, fontFamily: e.target.value })}
+              className="mt-1 block w-full bg-[var(--color-background)] border border-[var(--color-border)] rounded-md p-2 text-sm focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]"
+            >
+              {fontOptions.map(f => (
+                <option key={f.value} value={f.value}>{f.label}</option>
+              ))}
+            </select>
+          </div>
           
           {/* Logo Uploader */}
           <div>
