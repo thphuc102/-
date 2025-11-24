@@ -36,6 +36,7 @@ export enum AppStep {
 export enum GuestScreenMode {
   ATTRACT = 'ATTRACT',
   CONFIG_SELECTION = 'CONFIG_SELECTION', // New: User chooses layout
+  FRAME_SELECTION = 'FRAME_SELECTION', // New: User chooses frame
   TETHER_PREVIEW = 'TETHER_PREVIEW',
   LIVE_PREVIEW = 'LIVE_PREVIEW',
   COUNTDOWN = 'COUNTDOWN',
@@ -130,11 +131,13 @@ export interface GuestScreenState {
   isFlashActive?: boolean; // New: Trigger flash animation
   proSettings?: ProSettings; // Pass pro settings to guest
   layoutOptions?: LayoutOption[]; // New: Pass available layouts to guest
+  availableFrames?: string[]; // New: Pass available frames to guest
 }
 
 export type GuestAction =
   | { type: 'GUEST_START' }
   | { type: 'GUEST_SELECT_LAYOUT', layout: string }
+  | { type: 'GUEST_SELECT_FRAME', frameSrc: string } // New
   | { type: 'GUEST_EMAIL', email: string }
   | { type: 'GUEST_PRINT' }
   | { type: 'GUEST_ADD_DRAWING', drawing: DrawingPath }
@@ -162,7 +165,8 @@ export type PhotoboothSession = {
 };
 
 export type AppSettings = {
-  frameSrc: string | null;
+  frameSrc: string | null; // Keep as default/fallback
+  availableFrames: string[]; // New: List of uploaded frames
   hotFolderHandle: FileSystemDirectoryHandle | null;
   outputDirectoryHandle: FileSystemDirectoryHandle | null;
   placeholders: Placeholder[];

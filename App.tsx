@@ -103,7 +103,8 @@ const App: React.FC = () => {
             enableSmartCrop: false,
             liveViewLut: ''
         },
-        layoutOptions: generateDefaultLayouts()
+        layoutOptions: generateDefaultLayouts(),
+        availableFrames: []
     });
     const [session, setSession] = useState<PhotoboothSession>({
         isActive: false,
@@ -210,11 +211,31 @@ const App: React.FC = () => {
                 if (action.layout !== 'custom') {
                     applyPresetLayout(action.layout);
                 }
-                // Move to Photo Upload / Camera
+
+                // Check if we have multiple frames to choose from
+                if (settings.availableFrames && settings.availableFrames.length > 0) {
+                    sendMessage({
+                        mode: GuestScreenMode.FRAME_SELECTION,
+                        availableFrames: settings.availableFrames
+                    });
+                } else {
+                    // Skip frame selection if none or only default
+                    setAppStep(AppStep.PHOTO_UPLOAD);
+                    sendMessage({
+                        mode: GuestScreenMode.LIVE_PREVIEW,
+                        frameSrc: settings.frameSrc,
+                        placeholders: settings.placeholders,
+                        aspectRatio: settings.aspectRatio,
+                        proSettings: settings.pro
+                    });
+                }
+                break;
+            case 'GUEST_SELECT_FRAME':
+                setSettings(prev => ({ ...prev, frameSrc: action.frameSrc }));
                 setAppStep(AppStep.PHOTO_UPLOAD);
                 sendMessage({
                     mode: GuestScreenMode.LIVE_PREVIEW,
-                    frameSrc: settings.frameSrc,
+                    frameSrc: action.frameSrc,
                     placeholders: settings.placeholders,
                     aspectRatio: settings.aspectRatio,
                     proSettings: settings.pro

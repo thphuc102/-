@@ -69,12 +69,34 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
     };
 
     const handleFrameFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file && file.type === 'image/png') {
-            const url = URL.createObjectURL(file);
-            handleSettingChange('frameSrc', url);
-        } else {
-            alert('Please select a valid PNG file.');
+        const files = event.target.files;
+        if (files && files.length > 0) {
+            const newFrames: string[] = [];
+            Array.from(files).forEach((file: File) => {
+                if (file.type === 'image/png') {
+                    newFrames.push(URL.createObjectURL(file));
+                }
+            });
+
+            if (newFrames.length > 0) {
+                const currentFrames = localSettings.availableFrames || [];
+                // If no frames existed, set the first new one as default
+                if (currentFrames.length === 0 && !localSettings.frameSrc) {
+                    handleSettingChange('frameSrc', newFrames[0]);
+                }
+                handleSettingChange('availableFrames', [...currentFrames, ...newFrames]);
+            }
+        }
+    };
+
+    const handleRemoveFrame = (index: number) => {
+        const currentFrames = localSettings.availableFrames || [];
+        const newFrames = currentFrames.filter((_, i) => i !== index);
+        handleSettingChange('availableFrames', newFrames);
+
+        // If we deleted the active frame, pick another one or null
+        if (currentFrames[index] === localSettings.frameSrc) {
+            handleSettingChange('frameSrc', newFrames.length > 0 ? newFrames[0] : null);
         }
     };
 
@@ -134,23 +156,41 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
         <div className="space-y-6">
             {/* Frame Selection */}
             <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Frame Overlay (PNG)</label>
-                <input type="file" ref={frameInputRef} onChange={handleFrameFileChange} accept="image/png" className="hidden" />
-                <div className="w-full h-32 border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center bg-gray-900/50">
-                    {localSettings.frameSrc ? (
-                        <div className="relative group p-2">
-                            <img src={localSettings.frameSrc} alt="Frame Preview" className="max-h-28 max-w-full object-contain" />
-                            <button onClick={() => frameInputRef.current?.click()} className="absolute inset-0 bg-black/60 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                                Change
-                            </button>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Frame Overlays (PNG)</label>
+                <input type="file" ref={frameInputRef} onChange={handleFrameFileChange} accept="image/png" multiple className="hidden" />
+
+                <div className="grid grid-cols-3 gap-4">
+                    {/* Add Button */}
+                    <button onClick={() => frameInputRef.current?.click()} className="aspect-[2/3] border-2 border-dashed border-gray-600 rounded-lg flex flex-col items-center justify-center bg-gray-900/50 hover:bg-gray-800 hover:border-gray-500 transition-colors">
+                        <UploadIcon className="h-8 w-8 text-gray-400" />
+                        <span className="text-xs text-gray-400 mt-2">Add Frames</span>
+                    </button>
+
+                    {/* Frame List */}
+                    {(localSettings.availableFrames || []).map((frame, index) => (
+                        <div key={index} className="relative group aspect-[2/3] bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
+                            <img src={frame} alt={`Frame ${index + 1}`} className="w-full h-full object-contain" />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                                <button
+                                    onClick={() => handleSettingChange('frameSrc', frame)}
+                                    className={`px-3 py-1 rounded text-xs font-bold ${localSettings.frameSrc === frame ? 'bg-green-600 text-white' : 'bg-white text-black hover:bg-gray-200'}`}
+                                >
+                                    {localSettings.frameSrc === frame ? 'Default' : 'Set Default'}
+                                </button>
+                                <button
+                                    onClick={() => handleRemoveFrame(index)}
+                                    className="px-3 py-1 bg-red-600 text-white rounded text-xs font-bold hover:bg-red-700"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                            {localSettings.frameSrc === frame && (
+                                <div className="absolute top-2 right-2 w-3 h-3 bg-green-500 rounded-full border border-white shadow-sm"></div>
+                            )}
                         </div>
-                    ) : (
-                        <button onClick={() => frameInputRef.current?.click()} className="text-center text-gray-500 hover:text-indigo-400">
-                            <UploadIcon className="mx-auto h-8 w-8" />
-                            <p className="text-xs mt-1">Upload Frame</p>
-                        </button>
-                    )}
+                    ))}
                 </div>
+                <p className="text-xs text-gray-500 mt-2">Upload multiple frames. Guests can choose their favorite if more than one is available.</p>
             </div>
 
             {/* Output Folder Selection */}
