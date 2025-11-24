@@ -119,12 +119,15 @@ export interface LayoutOption {
 export interface FrameLayout {
   layoutId: string; // e.g., 'strip-3', 'grid-2x2'
   placeholders: Placeholder[];
+  overlaySrc?: string; // Specific overlay for this layout
 }
 
 export interface FrameConfig {
   id: string;
-  src: string;
+  name: string; // Display name for the frame group
+  thumbnailSrc: string; // Representative image
   supportedLayouts: FrameLayout[];
+  isVisible: boolean; // Toggle visibility
 }
 
 export interface GuestScreenState {

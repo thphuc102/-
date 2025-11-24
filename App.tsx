@@ -260,9 +260,9 @@ const App: React.FC = () => {
                     applyPresetLayout(action.layout);
                 }
 
-                // Filter frames that support this layout
+                // Filter frames that support this layout AND are visible
                 const compatibleFrames = settings.availableFrames.filter(f =>
-                    f.supportedLayouts.some(sl => sl.layoutId === action.layout)
+                    f.isVisible && f.supportedLayouts.some(sl => sl.layoutId === action.layout)
                 );
 
                 // Check if we have multiple frames to choose from
@@ -291,30 +291,7 @@ const App: React.FC = () => {
                 break;
             case 'GUEST_SELECT_FRAME':
                 // Find the frame config
-                const selectedFrame = settings.availableFrames.find(f => f.src === action.frameSrc);
-
-                // Find the layout configuration for the CURRENTLY selected layout type (which we need to track)
-                // We need to know which layout ID was selected. 
-                // We can infer it from settings.placeholders if we tracked it, but better to track `currentLayoutId` in state.
-                // For now, let's assume we find the first supported layout that matches the current placeholders structure? 
-                // No, that's hard.
-                // We need to store `currentLayoutId` in AppSettings.
-
-                // Let's just pick the first supported layout of the frame if we don't know the ID, 
-                // OR we need to pass the layout ID in the action?
-                // The guest selected a layout previously. We should have stored it.
-                // Let's assume we can find the matching layout in the frame config based on the *active* layout option.
-                // But wait, `settings.layoutOptions` has `isActive`.
-                // We need to know which one was clicked.
-                // Let's add `currentLayoutId` to AppSettings or just use the one that matches the current placeholders?
-                // Actually, `applyPresetLayout` sets placeholders.
-                // We need to find the `FrameLayout` in `selectedFrame` that corresponds to the *active* layout.
-                // We can iterate through `selectedFrame.supportedLayouts` and find one where `layoutId` matches the ID of the layout the user selected.
-                // But we don't have `currentLayoutId` in state easily.
-                // Let's add `currentLayoutId` to AppSettings.
-
-                // For this step, I'll just use the first one or try to match.
-                // Better: Update AppSettings to include `currentLayoutId`.
+                const selectedFrame = settings.availableFrames.find(f => f.thumbnailSrc === action.frameSrc);
 
                 if (selectedFrame) {
                     // Try to find the layout that matches the current one
@@ -322,7 +299,7 @@ const App: React.FC = () => {
                     // For now, let's just use the first supported layout as a fallback.
                     setSettings(prev => ({
                         ...prev,
-                        frameSrc: selectedFrame.src,
+                        frameSrc: selectedFrame.thumbnailSrc,
                         // placeholders: selectedFrame.supportedLayouts[0].placeholders // Placeholder logic needs refinement
                     }));
                 } else {
@@ -512,18 +489,21 @@ const App: React.FC = () => {
 
     const { startPolling, stopPolling } = useHotFolder(settings.hotFolderHandle, handleNewPhotosFromHotFolder);
 
-    const handleFrameSelect = (frameFile: File) => {
+    const handleFrameSelect = (frameFile: File, selectedLayoutIds: string[]) => {
         const url = URL.createObjectURL(frameFile);
 
         // Create a new FrameConfig
         const newFrameConfig: import('./types').FrameConfig = {
             id: Date.now().toString(),
-            src: url,
+            name: frameFile.name.replace('.png', ''), // Default name from filename
+            thumbnailSrc: url,
+            isVisible: true, // Default to visible
             supportedLayouts: (settings.layoutOptions || [])
-                .filter(l => l.isActive)
+                .filter(l => selectedLayoutIds.includes(l.id))
                 .map(l => ({
                     layoutId: l.id,
-                    placeholders: l.placeholders
+                    placeholders: l.placeholders,
+                    overlaySrc: url // Default overlay is the uploaded file
                 }))
         };
 
@@ -541,7 +521,7 @@ const App: React.FC = () => {
         setSettings(s => {
             // Update the specific frame's layout in availableFrames
             const updatedFrames = s.availableFrames.map(f =>
-                f.src === currentFrameSrc ? { ...f, placeholders } : f
+                f.thumbnailSrc === currentFrameSrc ? { ...f, placeholders } : f
             );
 
             return {
@@ -1199,6 +1179,7 @@ const App: React.FC = () => {
                 isGapiReady={isGapiReady}
                 isSignedIn={isSignedIn}
                 pickerApiLoaded={pickerApiLoaded}
+                availableLayouts={settings.layoutOptions || []}
             />,
             [AppStep.TEMPLATE_DESIGN]: <TemplateDesigner frameSrc={settings.frameSrc} onTemplateConfirm={handleTemplateConfirm} />,
             [AppStep.PHOTO_UPLOAD]: <PhotoSelector
@@ -1219,7 +1200,10 @@ const App: React.FC = () => {
                     <div className="flex-1 flex justify-center">
                         <StepIndicator currentStep={appStep} />
                     </div>
-                    <div className="flex-1 flex justify-end">
+                    <div className="flex-1 flex justify-end gap-2">
+                        <button onClick={() => setIsSettingsOpen(true)} className="p-2 bg-[var(--color-panel)] rounded-lg hover:bg-black/20" title="Settings">
+                            <SettingsIcon className="w-6 h-6" />
+                        </button>
                         <button onClick={() => setIsUiPanelOpen(true)} className="p-2 bg-[var(--color-panel)] rounded-lg hover:bg-black/20" title="Customize UI">
                             <PaletteIcon className="w-6 h-6" />
                         </button>
@@ -1238,6 +1222,19 @@ const App: React.FC = () => {
             <div className="relative z-10">
                 {appStep === AppStep.FINALIZE_AND_EXPORT ? renderFinalizeStep() : renderSetup()}
             </div>
+            <SettingsPanel
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                settings={settings}
+                onSettingsChange={setSettings}
+                analytics={analytics}
+            />
+            <UiCustomizationPanel
+                isOpen={isUiPanelOpen}
+                onClose={() => setIsUiPanelOpen(false)}
+                config={uiConfig}
+                onConfigChange={setUiConfig}
+            />
         </div>
     );
 };

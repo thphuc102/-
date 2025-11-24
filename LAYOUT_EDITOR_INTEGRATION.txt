@@ -1,0 +1,42 @@
+// This file contains the code additions needed for LayoutEditorModal integration
+// Add these to SettingsPanel.tsx
+
+// 1. UPDATE IMPORTS (line 2) - Add Placeholder to the imports:
+// FROM:
+import { Printer, AppSettings, OrganizerSettings, AnalyticsData } from '../types';
+// TO:
+import { Printer, AppSettings, OrganizerSettings, AnalyticsData, Placeholder } from '../types';
+
+// 2. ADD IMPORT (after line 5, before icons import):
+import LayoutEditorModal from './LayoutEditorModal';
+
+// 3. ADD STATE VARIABLES (after line 21, after editingFrameId state):
+const [isEditingLayout, setIsEditingLayout] = useState(false);
+const [editingLayoutId, setEditingLayoutId] = useState<string | null>(null);
+
+// 4. ADD HANDLER FUNCTIONS (after handleRemoveLayout function, around line 181):
+const handleLayoutSelectForEditing = (layoutId: string) => {
+    setEditingLayoutId(layoutId);
+    setIsEditingLayout(true);
+};
+
+const handleSaveLayoutPlaceholders = (placeholders: Placeholder[]) => {
+    if (!editingLayoutId) return;
+    
+    const updatedLayouts = localSettings.layoutOptions.map(l =>
+        l.id === editingLayoutId ? { ...l, placeholders } : l
+    );
+    handleSettingChange('layoutOptions', updatedLayouts);
+};
+
+// 5. ADD MODAL RENDERING (before the final </> closing tag, around line 640):
+{isEditingLayout && (
+    <LayoutEditorModal
+        layout={localSettings.layoutOptions?.find(l => l.id === editingLayoutId)}
+        onClose={() => {
+            setIsEditingLayout(false);
+            setEditingLayoutId(null);
+        }}
+        onSave={handleSaveLayoutPlaceholders}
+    />
+)}

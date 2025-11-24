@@ -14,16 +14,7 @@ declare global {
   }
 }
 
-interface FrameUploaderProps {
-  onFrameSelect: (frameFile: File) => void;
-  organizerSettings: OrganizerSettings;
-  onSettingsChange: (settings: OrganizerSettings) => void;
-  setDirectoryHandle: React.Dispatch<React.SetStateAction<FileSystemDirectoryHandle | null>>;
-  gapiAuthInstance: any;
-  isGapiReady: boolean;
-  isSignedIn: boolean;
-  pickerApiLoaded: boolean;
-}
+
 
 const SetupModal: React.FC<{
   isOpen: boolean;
@@ -250,7 +241,43 @@ const FrameUploader: React.FC<FrameUploaderProps> = ({ onFrameSelect, organizerS
   const isPanning = useRef(false);
   const lastMousePosition = useRef({ x: 0, y: 0 });
 
-  // ... handleFileChange ...
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.type !== 'image/png') {
+        setError('Please upload a PNG file.');
+        return;
+      }
+      setSelectedFile(file);
+      setFramePreview(URL.createObjectURL(file));
+      setError(null);
+      setZoom({ scale: 1, x: 0, y: 0 });
+    }
+  };
+
+  const triggerFileSelect = () => fileInputRef.current?.click();
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLImageElement>) => {
+    if (zoom.scale > 1) {
+      isPanning.current = true;
+      lastMousePosition.current = { x: e.clientX, y: e.clientY };
+      e.currentTarget.style.cursor = 'grabbing';
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLImageElement>) => {
+    if (isPanning.current && zoom.scale > 1) {
+      const deltaX = e.clientX - lastMousePosition.current.x;
+      const deltaY = e.clientY - lastMousePosition.current.y;
+      setZoom(prev => ({ ...prev, x: prev.x + deltaX, y: prev.y + deltaY }));
+      lastMousePosition.current = { x: e.clientX, y: e.clientY };
+    }
+  };
+
+  const handleMouseUpOrLeave = (e: React.MouseEvent<HTMLImageElement>) => {
+    isPanning.current = false;
+    e.currentTarget.style.cursor = zoom.scale > 1 ? 'grab' : 'pointer';
+  };
 
   const handleConfirmClick = () => {
     if (selectedFile) {
@@ -262,12 +289,18 @@ const FrameUploader: React.FC<FrameUploaderProps> = ({ onFrameSelect, organizerS
 
   const handleLayoutConfirm = (selectedLayoutIds: string[]) => {
     if (selectedFile) {
-      onFrameSelect(selectedFile, selectedLayoutIds);
+      const fileToUpload = selectedFile;
       setLayoutModalOpen(false);
+
+      setFramePreview(null);
+      setSelectedFile(null);
+      setZoom({ scale: 1, x: 0, y: 0 });
+
+      setTimeout(() => {
+        onFrameSelect(fileToUpload, selectedLayoutIds);
+      }, 100);
     }
   };
-
-  // ... rest of component ...
 
   return (
     <div className="w-full max-w-2xl mx-auto flex flex-col items-center gap-6 p-8 bg-[var(--color-panel)] rounded-2xl shadow-lg relative">
@@ -278,7 +311,66 @@ const FrameUploader: React.FC<FrameUploaderProps> = ({ onFrameSelect, organizerS
         <SettingsIcon className="w-6 h-6" />
       </button>
 
-      {/* ... rest of UI ... */}
+      <h2 className="text-2xl font-bold text-[var(--color-primary)]">Step 1: Upload Your Frame</h2>
+      <p className="opacity-70 text-center">Upload a transparent PNG to use as an overlay for your photos.</p>
+
+      <div className="flex bg-[var(--color-background)] rounded-lg p-1 border border-[var(--color-border)]">
+        <button
+          onClick={() => setOrientation('landscape')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${orientation === 'landscape' ? 'bg-[var(--color-primary)] text-white shadow-sm' : 'text-[var(--color-text-primary)] hover:bg-white/5'}`}
+        >
+          Landscape
+        </button>
+        <button
+          onClick={() => setOrientation('portrait')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${orientation === 'portrait' ? 'bg-[var(--color-primary)] text-white shadow-sm' : 'text-[var(--color-text-primary)] hover:bg-white/5'}`}
+        >
+          Portrait
+        </button>
+      </div>
+
+      <div className={`relative border-2 border-dashed border-[var(--color-border)] rounded-xl flex items-center justify-center overflow-hidden transition-all duration-500 ${orientation === 'landscape' ? 'w-[600px] h-[400px]' : 'w-[400px] h-[600px]'} ${!framePreview ? 'hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 cursor-pointer' : 'bg-[var(--color-background)]'}`}>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept="image/png"
+          className="hidden"
+        />
+
+        {framePreview ? (
+          <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+            <img
+              src={framePreview}
+              alt="Frame Preview"
+              className="max-w-full max-h-full object-contain transition-transform duration-100 ease-out select-none"
+              style={{ transform: `scale(${zoom.scale}) translate(${zoom.x}px, ${zoom.y}px)` }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUpOrLeave}
+              onMouseLeave={handleMouseUpOrLeave}
+              draggable={false}
+            />
+            {/* Zoom Controls Overlay */}
+            <div className="absolute bottom-4 right-4 flex gap-2 bg-black/50 backdrop-blur-sm p-2 rounded-lg border border-white/10">
+              <button onClick={() => setZoom(z => ({ ...z, scale: Math.max(1, z.scale - 0.1) }))} className="p-1 hover:bg-white/20 rounded text-white"><ZoomOutIcon className="w-5 h-5" /></button>
+              <button onClick={() => setZoom({ scale: 1, x: 0, y: 0 })} className="p-1 hover:bg-white/20 rounded text-white"><ResetIcon className="w-5 h-5" /></button>
+              <button onClick={() => setZoom(z => ({ ...z, scale: Math.min(3, z.scale + 0.1) }))} className="p-1 hover:bg-white/20 rounded text-white"><ZoomInIcon className="w-5 h-5" /></button>
+            </div>
+            <button onClick={() => { setFramePreview(null); setSelectedFile(null); }} className="absolute top-4 right-4 p-2 bg-red-500/80 hover:bg-red-600 text-white rounded-full shadow-lg transition-transform hover:scale-110">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+            </button>
+          </div>
+        ) : (
+          <div onClick={triggerFileSelect} className="text-center text-[var(--color-text-primary)] opacity-50 hover:opacity-100 transition-opacity">
+            <UploadIcon className="mx-auto h-12 w-12 mb-2" />
+            <p className="font-medium">Click to browse</p>
+            <p className="text-xs mt-1">Supports PNG</p>
+          </div>
+        )}
+      </div>
+
+      {error && <p className="text-red-500 text-sm font-medium animate-pulse">{error}</p>}
 
       <button
         onClick={handleConfirmClick} // Changed handler
