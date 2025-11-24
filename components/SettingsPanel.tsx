@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppSettings, AnalyticsData, Printer } from '../types';
+import { Printer, AppSettings, OrganizerSettings, AnalyticsData } from '../types';
+import FrameUploader from './FrameUploader'; // Import FrameUploader
 import { GoogleDriveIcon, UploadIcon, FolderIcon, ServerIcon, ChipIcon, SwatchIcon } from './icons';
 
 interface SettingsPanelProps {
@@ -68,35 +69,57 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
         }
     };
 
-    const handleFrameFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = event.target.files;
-        if (files && files.length > 0) {
-            const newFrames: string[] = [];
-            Array.from(files).forEach((file: File) => {
-                if (file.type === 'image/png') {
-                    newFrames.push(URL.createObjectURL(file));
-                }
-            });
+    const handleFrameFileChange = (file: File, selectedLayoutIds: string[]) => {
+        if (file && file.type === 'image/png') {
+            // Filter layouts based on user selection
+            const supportedLayouts = (localSettings.layoutOptions || [])
+                .filter(l => selectedLayoutIds.includes(l.id))
+                .map(l => ({
+                    layoutId: l.id,
+                    placeholders: l.placeholders
+                }));
 
-            if (newFrames.length > 0) {
-                const currentFrames = localSettings.availableFrames || [];
-                // If no frames existed, set the first new one as default
-                if (currentFrames.length === 0 && !localSettings.frameSrc) {
-                    handleSettingChange('frameSrc', newFrames[0]);
+            const newFrame: import('../types').FrameConfig = {
+                id: Date.now().toString() + Math.random().toString(),
+                src: URL.createObjectURL(file),
+                supportedLayouts: supportedLayouts
+            };
+
+            const currentFrames = localSettings.availableFrames || [];
+            // If no frames existed, set the first new one as default
+            if (currentFrames.length === 0 && !localSettings.frameSrc) {
+                handleSettingChange('frameSrc', newFrame.src);
+                // Load the first supported layout's placeholders
+                if (newFrame.supportedLayouts.length > 0) {
+                    handleSettingChange('placeholders', newFrame.supportedLayouts[0].placeholders);
                 }
-                handleSettingChange('availableFrames', [...currentFrames, ...newFrames]);
             }
+            handleSettingChange('availableFrames', [...currentFrames, newFrame]);
         }
     };
 
     const handleRemoveFrame = (index: number) => {
         const currentFrames = localSettings.availableFrames || [];
+        const frameToRemove = currentFrames[index];
         const newFrames = currentFrames.filter((_, i) => i !== index);
         handleSettingChange('availableFrames', newFrames);
 
         // If we deleted the active frame, pick another one or null
-        if (currentFrames[index] === localSettings.frameSrc) {
-            handleSettingChange('frameSrc', newFrames.length > 0 ? newFrames[0] : null);
+        if (frameToRemove.src === localSettings.frameSrc) {
+            const nextFrame = newFrames.length > 0 ? newFrames[0] : null;
+            handleSettingChange('frameSrc', nextFrame ? nextFrame.src : null);
+            if (nextFrame && nextFrame.supportedLayouts.length > 0) {
+                handleSettingChange('placeholders', nextFrame.supportedLayouts[0].placeholders);
+            } else if (!nextFrame) {
+                handleSettingChange('placeholders', []); // Clear placeholders if no frame
+            }
+        }
+    };
+
+    const handleSetDefaultFrame = (frame: import('../types').FrameConfig) => {
+        handleSettingChange('frameSrc', frame.src);
+        if (frame.supportedLayouts.length > 0) {
+            handleSettingChange('placeholders', frame.supportedLayouts[0].placeholders);
         }
     };
 
@@ -169,13 +192,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
                     {/* Frame List */}
                     {(localSettings.availableFrames || []).map((frame, index) => (
                         <div key={index} className="relative group aspect-[2/3] bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
-                            <img src={frame} alt={`Frame ${index + 1}`} className="w-full h-full object-contain" />
+                            <img src={frame.src} alt={`Frame ${index + 1}`} className="w-full h-full object-contain" />
                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
                                 <button
-                                    onClick={() => handleSettingChange('frameSrc', frame)}
-                                    className={`px-3 py-1 rounded text-xs font-bold ${localSettings.frameSrc === frame ? 'bg-green-600 text-white' : 'bg-white text-black hover:bg-gray-200'}`}
+                                    onClick={() => handleSetDefaultFrame(frame)}
+                                    className={`px-3 py-1 rounded text-xs font-bold ${localSettings.frameSrc === frame.src ? 'bg-green-600 text-white' : 'bg-white text-black hover:bg-gray-200'}`}
                                 >
-                                    {localSettings.frameSrc === frame ? 'Default' : 'Set Default'}
+                                    {localSettings.frameSrc === frame.src ? 'Default' : 'Set Default'}
                                 </button>
                                 <button
                                     onClick={() => handleRemoveFrame(index)}
@@ -184,7 +207,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
                                     Delete
                                 </button>
                             </div>
-                            {localSettings.frameSrc === frame && (
+                            {localSettings.frameSrc === frame.src && (
                                 <div className="absolute top-2 right-2 w-3 h-3 bg-green-500 rounded-full border border-white shadow-sm"></div>
                             )}
                         </div>
@@ -297,10 +320,29 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
                                     <div className="flex items-center justify-end gap-2">
                                         <button
                                             onClick={() => {
+                                                // Update the layout globally in layoutOptions
                                                 const updatedLayouts = localSettings.layoutOptions.map(l =>
                                                     l.id === layout.id ? { ...l, placeholders: settings.placeholders } : l
                                                 );
                                                 handleSettingChange('layoutOptions', updatedLayouts);
+
+                                                // ALSO update the currently selected frame's supported layout for this ID
+                                                if (localSettings.frameSrc) {
+                                                    const updatedFrames = (localSettings.availableFrames || []).map(f => {
+                                                        if (f.src === localSettings.frameSrc) {
+                                                            const updatedSupported = f.supportedLayouts.map(sl =>
+                                                                sl.layoutId === layout.id ? { ...sl, placeholders: settings.placeholders } : sl
+                                                            );
+                                                            // If this layout wasn't supported, add it?
+                                                            if (!updatedSupported.some(sl => sl.layoutId === layout.id)) {
+                                                                updatedSupported.push({ layoutId: layout.id, placeholders: settings.placeholders });
+                                                            }
+                                                            return { ...f, supportedLayouts: updatedSupported };
+                                                        }
+                                                        return f;
+                                                    });
+                                                    handleSettingChange('availableFrames', updatedFrames);
+                                                }
                                             }}
                                             className="text-indigo-400 hover:text-indigo-300"
                                             title="Update with current canvas design"
@@ -416,62 +458,126 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
                     <label className="block text-xs text-gray-400 mb-1">ICC Profile</label>
                     <div className="flex gap-2">
                         <div className="flex-1 bg-gray-900 border border-gray-700 rounded p-2 text-sm text-gray-400 truncate">
-                            {localSettings.pro.iccProfileName || "sRGB (Default)"}
+                            <button onClick={() => iccInputRef.current?.click()} className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs">Load .ICC</button>
+                            <input type="file" ref={iccInputRef} onChange={handleIccFileChange} className="hidden" />
                         </div>
-                        <button onClick={() => iccInputRef.current?.click()} className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs">Load .ICC</button>
-                        <input type="file" ref={iccInputRef} onChange={handleIccFileChange} className="hidden" />
                     </div>
                 </div>
-
             </div>
         </div>
     );
 
+    const handleLayoutSelectForEditing = (layoutId: string) => {
+        if (!localSettings.frameSrc) return;
+
+        const frame = (localSettings.availableFrames || []).find(f => f.src === localSettings.frameSrc);
+        if (frame) {
+            const layoutConfig = frame.supportedLayouts.find(sl => sl.layoutId === layoutId);
+            if (layoutConfig) {
+                handleSettingChange('placeholders', layoutConfig.placeholders);
+            } else {
+                // If layout not supported yet, maybe load default from global options?
+                const globalLayout = localSettings.layoutOptions.find(l => l.id === layoutId);
+                if (globalLayout) {
+                    handleSettingChange('placeholders', globalLayout.placeholders);
+                }
+            }
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" aria-modal="true">
-            <div className="relative transform overflow-hidden rounded-lg bg-gray-800 border border-gray-700 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg p-6 space-y-6 max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between border-b border-gray-700 pb-4">
-                    <h3 className="text-lg font-medium leading-6 text-gray-100">Settings</h3>
-                    <div className="flex bg-gray-900 rounded-lg p-1">
-                        <button onClick={() => setActiveTab('general')} className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${activeTab === 'general' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}>General</button>
-                        <button onClick={() => setActiveTab('layouts')} className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${activeTab === 'layouts' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'}`}>Layouts</button>
-                        <button onClick={() => setActiveTab('pro')} className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${activeTab === 'pro' ? 'bg-yellow-600 text-white' : 'text-gray-400 hover:text-white'}`}>Pro Features</button>
+            <div className="relative transform overflow-hidden rounded-lg bg-gray-800 border border-gray-700 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl p-0 h-[90vh] flex flex-col">
+                {/* Header */}
+                <div className="p-6 border-b border-gray-700 flex items-center justify-between bg-gray-800">
+                    <h2 className="text-xl font-bold text-white">Settings</h2>
+                    <div className="flex gap-2">
+                        <button onClick={onClose} className="px-4 py-2 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors">Cancel</button>
+                        <button onClick={handleSave} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 shadow-lg shadow-indigo-500/20 transition-all">Save Changes</button>
                     </div>
                 </div>
 
-                {/* Analytics Summary */}
-                {analytics && (
-                    <div className="grid grid-cols-4 gap-2 mb-4 bg-black/20 p-4 rounded-lg">
-                        <div className="text-center">
-                            <p className="text-xl font-bold text-indigo-400">{analytics.totalSessions}</p>
-                            <p className="text-[10px] text-gray-400">Sessions</p>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-xl font-bold text-pink-400">{analytics.totalPrints}</p>
-                            <p className="text-[10px] text-gray-400">Prints</p>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-xl font-bold text-green-400">{analytics.emailsCollected.length}</p>
-                            <p className="text-[10px] text-gray-400">Emails</p>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-xl font-bold text-yellow-400">${analytics.totalRevenue}</p>
-                            <p className="text-[10px] text-gray-400">Rev</p>
-                        </div>
-                        {analytics.emailsCollected.length > 0 && (
-                            <button onClick={handleDownloadEmails} className="col-span-4 mt-2 text-xs text-blue-400 hover:text-blue-300 underline text-center">Download CSV</button>
-                        )}
-                    </div>
-                )}
+                {/* Tabs */}
+                <div className="flex border-b border-gray-700 bg-gray-800">
+                    <button onClick={() => setActiveTab('general')} className={`flex-1 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'general' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-200'}`}>General</button>
+                    <button onClick={() => setActiveTab('layouts')} className={`flex-1 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'layouts' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-200'}`}>Layouts</button>
+                    <button onClick={() => setActiveTab('pro')} className={`flex-1 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'pro' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-200'}`}>Pro Features</button>
+                </div>
 
-                {activeTab === 'general' && renderGeneralSettings()}
-                {activeTab === 'layouts' && renderLayoutSettings()}
-                {activeTab === 'pro' && renderProSettings()}
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-gray-900">
+                    {activeTab === 'general' && (
+                        <div className="space-y-8">
+                            {/* Frame Management Section */}
+                            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                                <h3 className="text-lg font-medium text-white mb-4">Frame Management</h3>
 
-                {/* Buttons */}
-                <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-700">
-                    <button type="button" onClick={onClose} className="inline-flex justify-center rounded-md border border-gray-600 px-4 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700">Cancel</button>
-                    <button type="button" onClick={handleSave} className="inline-flex justify-center rounded-md border border-transparent bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600">Save Changes</button>
+                                {/* Layout Selector for Editing */}
+                                {localSettings.frameSrc && (
+                                    <div className="mb-4 p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                                        <label className="block text-sm font-medium text-gray-300 mb-2">Editing Layout For:</label>
+                                        <select
+                                            className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                                            onChange={(e) => handleLayoutSelectForEditing(e.target.value)}
+                                            defaultValue=""
+                                        >
+                                            <option value="" disabled>Select a layout to edit...</option>
+                                            {(localSettings.availableFrames?.find(f => f.src === localSettings.frameSrc)?.supportedLayouts || []).map(sl => {
+                                                const layoutOption = localSettings.layoutOptions.find(lo => lo.id === sl.layoutId);
+                                                return (
+                                                    <option key={sl.layoutId} value={sl.layoutId}>
+                                                        {layoutOption?.label || sl.layoutId}
+                                                    </option>
+                                                );
+                                            })}
+                                        </select>
+                                        <p className="text-xs text-gray-400 mt-2">Select a layout to load its placeholders into the editor. Save changes in the "Layouts" tab.</p>
+                                    </div>
+                                )}
+
+                                <FrameUploader
+                                    onFrameSelect={handleFrameFileChange}
+                                    organizerSettings={localSettings}
+                                    onSettingsChange={(s) => setLocalSettings(prev => ({ ...prev, ...s }))}
+                                    setDirectoryHandle={() => { }}
+                                    gapiAuthInstance={null}
+                                    isGapiReady={false}
+                                    isSignedIn={false}
+                                    pickerApiLoaded={false}
+                                    availableLayouts={localSettings.layoutOptions || []}
+                                />
+
+                                <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                    {/* Frame List */}
+                                    {(localSettings.availableFrames || []).map((frame, index) => (
+                                        <div key={index} className="relative group aspect-[2/3] bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
+                                            <img src={frame.src} alt={`Frame ${index + 1}`} className="w-full h-full object-contain" />
+                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                                                <button
+                                                    onClick={() => handleSetDefaultFrame(frame)}
+                                                    className={`px-3 py-1 rounded text-xs font-bold ${localSettings.frameSrc === frame.src ? 'bg-green-600 text-white' : 'bg-white text-black hover:bg-gray-200'}`}
+                                                >
+                                                    {localSettings.frameSrc === frame.src ? 'Default' : 'Set Default'}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleRemoveFrame(index)}
+                                                    className="px-3 py-1 bg-red-600 text-white rounded text-xs font-bold hover:bg-red-700"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                            {localSettings.frameSrc === frame.src && (
+                                                <div className="absolute top-2 right-2 w-3 h-3 bg-green-500 rounded-full border border-white shadow-sm"></div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            {renderGeneralSettings()}
+                        </div>
+                    )}
+                    {activeTab === 'layouts' && renderLayoutSettings()}
+                    {activeTab === 'pro' && renderProSettings()}
                 </div>
             </div>
         </div>

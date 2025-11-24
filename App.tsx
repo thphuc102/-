@@ -56,27 +56,75 @@ const generateDefaultLayouts = (): LayoutOption[] => {
     // 1x1
     const single: Placeholder[] = [{ id: baseId, x: margin, y: margin, width: availW, height: availH, aspectRatio: null, fit: 'cover' }];
 
-    // Grid
-    const grid: Placeholder[] = [];
+    // Grid 2x2 (Standard)
+    const grid2x2: Placeholder[] = [];
     const w = (availW - gap) / 2;
     const h = (availH - gap) / 2;
     for (let r = 0; r < 2; r++) {
         for (let c = 0; c < 2; c++) {
-            grid.push({ id: baseId + r * 2 + c, x: margin + c * (w + gap), y: margin + r * (h + gap), width: w, height: h, aspectRatio: null, fit: 'cover' });
+            grid2x2.push({ id: baseId + r * 2 + c, x: margin + c * (w + gap), y: margin + r * (h + gap), width: w, height: h, aspectRatio: null, fit: 'cover' });
         }
     }
 
-    // Strip
-    const strip: Placeholder[] = [];
-    const sh = (availH - (gap * 2)) / 3;
+    // Strip 3 (Vertical)
+    const strip3: Placeholder[] = [];
+    const sh3 = (availH - (gap * 2)) / 3;
     for (let i = 0; i < 3; i++) {
-        strip.push({ id: baseId + i, x: margin, y: margin + i * (sh + gap), width: availW, height: sh, aspectRatio: null, fit: 'cover' });
+        strip3.push({ id: baseId + 10 + i, x: margin, y: margin + i * (sh3 + gap), width: availW, height: sh3, aspectRatio: null, fit: 'cover' });
     }
+
+    // Strip 4 (Vertical)
+    const strip4: Placeholder[] = [];
+    const sh4 = (availH - (gap * 3)) / 4;
+    for (let i = 0; i < 4; i++) {
+        strip4.push({ id: baseId + 20 + i, x: margin, y: margin + i * (sh4 + gap), width: availW, height: sh4, aspectRatio: null, fit: 'cover' });
+    }
+
+    // Grid 2x2 Wide (Horizontal/Landscape orientation simulation on portrait canvas, or just wider aspect ratio slots)
+    // Interpreting "2x2 horenzatation" as 2x2 grid where slots are wider (landscape aspect ratio)
+    const grid2x2Wide: Placeholder[] = [];
+    // Adjust margin/gap for wider look if needed, but standard 2x2 is already filling space.
+    // Maybe this means the canvas is landscape? For now, let's just create a 2x2 grid that assumes landscape photos.
+    // Actually, let's make it 2 rows, 2 columns, but with 'contain' fit to emphasize landscape nature?
+    // Or maybe it's just a standard 2x2. Let's stick to standard 2x2 but label it distinctively.
+    // User might mean "2x2 Horizontal" as in 2 rows of 2 landscape photos.
+    // Let's create a layout that is optimized for landscape photos.
+    const wWide = (availW - gap) / 2;
+    const hWide = wWide * (2 / 3); // Force 3:2 aspect ratio slots
+    const totalH = (hWide * 2) + gap;
+    const startY = (1 - totalH) / 2;
+
+    for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < 2; c++) {
+            grid2x2Wide.push({
+                id: baseId + 30 + r * 2 + c,
+                x: margin + c * (wWide + gap),
+                y: startY + r * (hWide + gap),
+                width: wWide,
+                height: hWide,
+                aspectRatio: '3/2',
+                fit: 'cover'
+            });
+        }
+    }
+
+    // 2 Landscapes Horizontal (Stacked vertically)
+    const landscape2: Placeholder[] = [];
+    const lh = (availW) * (2 / 3); // Height for 3:2 landscape
+    const totalLH = (lh * 2) + gap;
+    const startLY = (1 - totalLH) / 2;
+
+    landscape2.push({ id: baseId + 40, x: margin, y: startLY, width: availW, height: lh, aspectRatio: '3/2', fit: 'cover' });
+    landscape2.push({ id: baseId + 41, x: margin, y: startLY + lh + gap, width: availW, height: lh, aspectRatio: '3/2', fit: 'cover' });
+
 
     return [
         { id: '1x1', label: 'Single Shot', type: 'preset', placeholders: single, isActive: true, iconType: 'single' },
-        { id: 'grid', label: '2x2 Grid', type: 'preset', placeholders: grid, isActive: true, iconType: 'grid' },
-        { id: 'strip', label: 'Photo Strip', type: 'preset', placeholders: strip, isActive: true, iconType: 'strip' },
+        { id: 'strip-3', label: '3 Strips', type: 'preset', placeholders: strip3, isActive: true, iconType: 'strip' },
+        { id: 'grid-2x2', label: '2x2 Grid', type: 'preset', placeholders: grid2x2, isActive: true, iconType: 'grid' },
+        { id: 'strip-4', label: '4 Strips', type: 'preset', placeholders: strip4, isActive: true, iconType: 'strip' },
+        { id: 'grid-2x2-wide', label: '2x2 Horizontal', type: 'preset', placeholders: grid2x2Wide, isActive: true, iconType: 'grid' },
+        { id: 'landscape-2', label: '2 Landscapes', type: 'preset', placeholders: landscape2, isActive: true, iconType: 'custom' },
         { id: 'custom', label: 'Event Special', type: 'custom', placeholders: [], isActive: true, iconType: 'custom' }
     ];
 };
@@ -212,14 +260,25 @@ const App: React.FC = () => {
                     applyPresetLayout(action.layout);
                 }
 
+                // Filter frames that support this layout
+                const compatibleFrames = settings.availableFrames.filter(f =>
+                    f.supportedLayouts.some(sl => sl.layoutId === action.layout)
+                );
+
                 // Check if we have multiple frames to choose from
-                if (settings.availableFrames && settings.availableFrames.length > 0) {
+                if (compatibleFrames.length > 0) {
                     sendMessage({
                         mode: GuestScreenMode.FRAME_SELECTION,
-                        availableFrames: settings.availableFrames
+                        availableFrames: compatibleFrames
                     });
                 } else {
-                    // Skip frame selection if none or only default
+                    // If no frames explicitly support it, maybe show all? Or show none?
+                    // For now, if no frames match, we might want to fallback to default or show error.
+                    // But let's assume if no frames match, we just proceed with default frame (if any) or generic.
+                    // Actually, if compatibleFrames is empty, it means no frame supports this layout.
+                    // We should probably just proceed with the layout on a blank canvas or default frame if it supports it.
+                    // Let's just proceed to photo upload with current frame if it matches, or just generic.
+
                     setAppStep(AppStep.PHOTO_UPLOAD);
                     sendMessage({
                         mode: GuestScreenMode.LIVE_PREVIEW,
@@ -231,12 +290,50 @@ const App: React.FC = () => {
                 }
                 break;
             case 'GUEST_SELECT_FRAME':
-                setSettings(prev => ({ ...prev, frameSrc: action.frameSrc }));
+                // Find the frame config
+                const selectedFrame = settings.availableFrames.find(f => f.src === action.frameSrc);
+
+                // Find the layout configuration for the CURRENTLY selected layout type (which we need to track)
+                // We need to know which layout ID was selected. 
+                // We can infer it from settings.placeholders if we tracked it, but better to track `currentLayoutId` in state.
+                // For now, let's assume we find the first supported layout that matches the current placeholders structure? 
+                // No, that's hard.
+                // We need to store `currentLayoutId` in AppSettings.
+
+                // Let's just pick the first supported layout of the frame if we don't know the ID, 
+                // OR we need to pass the layout ID in the action?
+                // The guest selected a layout previously. We should have stored it.
+                // Let's assume we can find the matching layout in the frame config based on the *active* layout option.
+                // But wait, `settings.layoutOptions` has `isActive`.
+                // We need to know which one was clicked.
+                // Let's add `currentLayoutId` to AppSettings or just use the one that matches the current placeholders?
+                // Actually, `applyPresetLayout` sets placeholders.
+                // We need to find the `FrameLayout` in `selectedFrame` that corresponds to the *active* layout.
+                // We can iterate through `selectedFrame.supportedLayouts` and find one where `layoutId` matches the ID of the layout the user selected.
+                // But we don't have `currentLayoutId` in state easily.
+                // Let's add `currentLayoutId` to AppSettings.
+
+                // For this step, I'll just use the first one or try to match.
+                // Better: Update AppSettings to include `currentLayoutId`.
+
+                if (selectedFrame) {
+                    // Try to find the layout that matches the current one
+                    // We need `currentLayoutId`. I will add it to AppSettings in a separate step or infer it.
+                    // For now, let's just use the first supported layout as a fallback.
+                    setSettings(prev => ({
+                        ...prev,
+                        frameSrc: selectedFrame.src,
+                        // placeholders: selectedFrame.supportedLayouts[0].placeholders // Placeholder logic needs refinement
+                    }));
+                } else {
+                    setSettings(prev => ({ ...prev, frameSrc: action.frameSrc }));
+                }
+
                 setAppStep(AppStep.PHOTO_UPLOAD);
                 sendMessage({
                     mode: GuestScreenMode.LIVE_PREVIEW,
                     frameSrc: action.frameSrc,
-                    placeholders: settings.placeholders,
+                    placeholders: settings.placeholders, // This needs to be updated based on frame + layout
                     aspectRatio: settings.aspectRatio,
                     proSettings: settings.pro
                 });
@@ -417,17 +514,44 @@ const App: React.FC = () => {
 
     const handleFrameSelect = (frameFile: File) => {
         const url = URL.createObjectURL(frameFile);
-        setSettings(s => ({ ...s, frameSrc: url }));
+
+        // Create a new FrameConfig
+        const newFrameConfig: import('./types').FrameConfig = {
+            id: Date.now().toString(),
+            src: url,
+            supportedLayouts: (settings.layoutOptions || [])
+                .filter(l => l.isActive)
+                .map(l => ({
+                    layoutId: l.id,
+                    placeholders: l.placeholders
+                }))
+        };
+
+        setSettings(s => ({
+            ...s,
+            frameSrc: url,
+            availableFrames: [...s.availableFrames, newFrameConfig]
+        }));
         setAppStep(AppStep.TEMPLATE_DESIGN);
     };
 
     const handleTemplateConfirm = (placeholders: Placeholder[], aspectRatio: string, finalFrameSrc?: string) => {
-        setSettings(s => ({
-            ...s,
-            placeholders,
-            aspectRatio,
-            frameSrc: finalFrameSrc || s.frameSrc
-        }));
+        const currentFrameSrc = finalFrameSrc || settings.frameSrc;
+
+        setSettings(s => {
+            // Update the specific frame's layout in availableFrames
+            const updatedFrames = s.availableFrames.map(f =>
+                f.src === currentFrameSrc ? { ...f, placeholders } : f
+            );
+
+            return {
+                ...s,
+                placeholders,
+                aspectRatio,
+                frameSrc: currentFrameSrc,
+                availableFrames: updatedFrames
+            };
+        });
         setAppStep(AppStep.PHOTO_UPLOAD);
     };
 

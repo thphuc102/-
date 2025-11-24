@@ -54,14 +54,14 @@ const ConfigSelectionMode: React.FC<{ layoutOptions: import('../types').LayoutOp
     );
 };
 
-const FrameSelectionMode: React.FC<{ availableFrames: string[], onSelect: (frameSrc: string) => void }> = ({ availableFrames, onSelect }) => {
+const FrameSelectionMode: React.FC<{ availableFrames: import('../types').FrameConfig[], onSelect: (frameSrc: string) => void }> = ({ availableFrames, onSelect }) => {
     return (
         <div className="w-full h-full bg-gray-900 text-white flex flex-col items-center justify-center p-8">
             <h2 className="text-5xl font-bold mb-12 uppercase tracking-wide">Choose Your Frame</h2>
             <div className="grid grid-cols-3 gap-8 w-full max-w-7xl">
                 {availableFrames.map((frame, index) => (
-                    <button key={index} onClick={() => onSelect(frame)} className="bg-gray-800 rounded-2xl p-4 flex flex-col items-center justify-center gap-6 border-4 border-transparent hover:border-indigo-500 hover:bg-gray-750 transition-all transform hover:scale-105 group aspect-[2/3]">
-                        <img src={frame} alt={`Frame ${index + 1}`} className="w-full h-full object-contain" />
+                    <button key={index} onClick={() => onSelect(frame.src)} className="bg-gray-800 rounded-2xl p-4 flex flex-col items-center justify-center gap-6 border-4 border-transparent hover:border-indigo-500 hover:bg-gray-750 transition-all transform hover:scale-105 group aspect-[2/3]">
+                        <img src={frame.src} alt={`Frame ${index + 1}`} className="w-full h-full object-contain" />
                     </button>
                 ))}
             </div>

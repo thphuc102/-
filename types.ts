@@ -116,6 +116,17 @@ export interface LayoutOption {
   iconType: 'single' | 'grid' | 'strip' | 'custom';
 }
 
+export interface FrameLayout {
+  layoutId: string; // e.g., 'strip-3', 'grid-2x2'
+  placeholders: Placeholder[];
+}
+
+export interface FrameConfig {
+  id: string;
+  src: string;
+  supportedLayouts: FrameLayout[];
+}
+
 export interface GuestScreenState {
   mode: GuestScreenMode;
   frameSrc?: string | null;
@@ -131,7 +142,7 @@ export interface GuestScreenState {
   isFlashActive?: boolean; // New: Trigger flash animation
   proSettings?: ProSettings; // Pass pro settings to guest
   layoutOptions?: LayoutOption[]; // New: Pass available layouts to guest
-  availableFrames?: string[]; // New: Pass available frames to guest
+  availableFrames?: FrameConfig[]; // New: Pass available frames to guest
 }
 
 export type GuestAction =
@@ -166,7 +177,7 @@ export type PhotoboothSession = {
 
 export type AppSettings = {
   frameSrc: string | null; // Keep as default/fallback
-  availableFrames: string[]; // New: List of uploaded frames
+  availableFrames: FrameConfig[]; // New: List of uploaded frames
   hotFolderHandle: FileSystemDirectoryHandle | null;
   outputDirectoryHandle: FileSystemDirectoryHandle | null;
   placeholders: Placeholder[];
